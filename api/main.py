@@ -1,5 +1,9 @@
 # api_gateway/main.py
-from fastapi import FastAPI
+import base64
+from pathlib import Path
+from typing import Optional
+
+from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from pydantic import BaseModel
 
 from celery_app import celery
@@ -10,10 +14,32 @@ class CaptionRequest(BaseModel):
     image_url: str
 
 @app.post("/caption")
-def create_caption(req: CaptionRequest):
+async def create_caption(file: Optional[UploadFile] = File(None), image_url: Optional[str] = None):
+    if not file and not image_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either file or image_url is required")
+
+    target_arg = None
+
+    if file:
+        target_dir = Path("caption")
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        suffix = Path(file.filename).suffix
+        filename = file.filename
+        file_path = target_dir / filename
+
+        content = await file.read()
+
+        b64_image = base64.b64encode(content).decode()
+
+        target_arg = b64_image
+    else:
+        target_arg = image_url
+
+
     task = celery.send_task(
         "caption.generate",
-        args=[req.image_url],
+        args=[target_arg],
     )
     return {"task_id": task.id}
 

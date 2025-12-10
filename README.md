@@ -1,6 +1,6 @@
 # AI Image Captioning
 
-A minimal FastAPI + Celery project that generates captions for remote images using the BLIP model. The API queues caption jobs to a Celery worker backed by Redis, and you can poll for results.
+A minimal FastAPI + Celery project that generates captions for images using the BLIP model. Submit either a public image URL or upload an image file; the API queues caption jobs to a Celery worker backed by Redis, and you can poll for results.
 
 ## Project Structure
 - **api/**: FastAPI gateway and Celery client
@@ -57,11 +57,10 @@ celery -A worker.celery_app.celery worker --loglevel=info
 Base URL: `http://localhost:8000`
 
 - **POST** `/caption`
-  - Queues a captioning task for the given image URL.
-  - Request body (JSON):
-    ```json
-    { "image_url": "https://example.com/image.jpg" }
-    ```
+  - Queues a captioning task for the given image.
+  - Provide exactly one of the following:
+    - File upload via multipart: form field name `file`
+    - Image URL via query string: `image_url`
   - Response:
     ```json
     { "task_id": "<celery_task_id>" }
@@ -74,16 +73,25 @@ Base URL: `http://localhost:8000`
     { "state": "PENDING" }
     ```
     ```json
-    { "state": "SUCCESS", "result": { "caption": "a caption...", "image_url": "...", "width": 123, "height": 456 } }
+    { "state": "SUCCESS", "result": { "caption": "a caption...", "width": 123, "height": 456 } }
     ```
     Other Celery states may be returned as `{ "state": "<STATE>" }`.
 
 ## Usage Examples
-- Create a captioning task:
+- Create a captioning task (file upload):
   ```bash
   curl -X POST http://localhost:8000/caption \
-       -H "Content-Type: application/json" \
-       -d '{"image_url": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e"}'
+       -H "Content-Type: multipart/form-data" \
+       -F "file=@/path/to/local/image.jpg"
+  ```
+  Response:
+  ```json
+  { "task_id": "c9422f5e-..." }
+  ```
+
+- Create a captioning task (image URL via query):
+  ```bash
+  curl -X POST "http://localhost:8000/caption?image_url=https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e"
   ```
   Response:
   ```json
@@ -100,7 +108,6 @@ Base URL: `http://localhost:8000`
     "state": "SUCCESS",
     "result": {
       "caption": "a portrait of a woman with flowers",
-      "image_url": "https://images.unsplash.com/...",
       "width": 4000,
       "height": 6000
     }
@@ -108,6 +115,7 @@ Base URL: `http://localhost:8000`
   ```
 
 ## Notes
-- The worker downloads the image; ensure the URL is publicly accessible and returns an image in a common format (JPEG/PNG).
+- If you send a URL, the worker downloads the image; ensure the URL is publicly accessible and returns an image in a common format (JPEG/PNG).
+- If you upload a file, it is transmitted as base64 to the worker internally.
 - First inference will download model weights; the initial request may take longer.
 - For production, consider setting timeouts, retries, and moving configuration to environment variables.
