@@ -50,7 +50,7 @@ uvicorn api.main:app --reload --port 8000
 
 2) Start the Celery worker:
 ```bash
-celery -A worker.celery_app.celery worker --loglevel=info
+celery -A worker.celery_app.celery worker --pool=solo --loglevel=info
 ```
 
 ## API Endpoints

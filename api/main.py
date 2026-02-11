@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from pydantic import BaseModel
 
-from celery_app import celery
+from api.celery_app import celery
 
 app = FastAPI()
 
